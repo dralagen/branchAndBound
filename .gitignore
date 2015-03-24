@@ -3,4 +3,5 @@
 
 *.o
 optimization-seq
+optimization-openmp
 
