@@ -11,6 +11,7 @@
 .PHONY: clean
 
 #BINROOT=/comptes/goualard-f/local/bin
+BINROOT=/usr/bin
 
 COMMON_SOURCES = interval.cpp minimizer.cpp functions.cpp
 COMMON_OBJECTS = $(COMMON_SOURCES:.cpp=.o)
@@ -27,7 +28,7 @@ optimization-seq: optimization-seq.cpp $(COMMON_OBJECTS)
 
 optimization-openmp: optimization-openmp.cpp $(COMMON_OBJECTS)
 	$(CXX) $(CXXFLAGS) -o $@ $< $(COMMON_OBJECTS) -lm
-	
+
 optimization-mpi: optimization-mpi.cpp $(COMMON_OBJECTS)
 	$(MPICXX) $(CXXFLAGS) -fopenmp -o $@ $< $(COMMON_OBJECTS) -lm
 
