@@ -136,7 +136,7 @@ int main(int argc, char** argv)
 	      minimize(fun.f,xr,yl,precision,local_min_ub,minimums);
 	      break;
 	    }
-    case 4: {
+    case 0: {
 	      minimize(fun.f,xr,yr,precision,local_min_ub,minimums);
 	      break;
 	    }
