@@ -15,6 +15,6 @@ How to launch
 
 - Sequentcial : `./optimization-seq [function precision]`
 - Parallel (OMP) : `./optimization-openmp [function precision]`
-- Parallel (MPI) : `mpirun -H host1,host2 -n 4 ./optimization-mpi [function precision]`
+- Parallel (MPI) : `mpirun -host host1,host2 -n 4 ./optimization-mpi [function precision]`
 
 If you run without parameter, you have access of help.
