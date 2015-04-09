@@ -114,32 +114,27 @@ int main(int argc, char** argv)
     return 1;
   }
 
-  int rank;
+  int rank,size;
 
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
 
   // split work on 4 worker
   interval xl, xr, yl, yr;
   split_box(fun.x,fun.y,xl,xr,yl,yr);
 
-  switch (rank) {
-    case 1: {
-	      minimize(fun.f,xl,yl,precision,local_min_ub,minimums);
-	      break;
-	    }
-    case 2: {
-	      minimize(fun.f,xl,yr,precision,local_min_ub,minimums);
-	      break;
-	    }
-    case 3: {
-	      minimize(fun.f,xr,yl,precision,local_min_ub,minimums);
-	      break;
-	    }
-    case 0: {
-	      minimize(fun.f,xr,yr,precision,local_min_ub,minimums);
-	      break;
-	    }
+  if ( 0 % size == rank) {
+    minimize(fun.f,xl,yl,precision,local_min_ub,minimums);
+  }
+  if ( 1 % size == rank) {
+    minimize(fun.f,xl,yr,precision,local_min_ub,minimums);
+  }
+  if ( 2 % size == rank) {
+    minimize(fun.f,xr,yl,precision,local_min_ub,minimums);
+  }
+  if ( 3 % size == rank) {
+    minimize(fun.f,xr,yr,precision,local_min_ub,minimums);
   }
 
   // Displaying all potential minimizers
