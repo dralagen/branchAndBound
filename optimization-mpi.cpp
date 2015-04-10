@@ -13,12 +13,55 @@ v. 1.0, 2013-02-15
 #include <string>
 #include <stdexcept>
 #include <mpi.h>
+#include <thread>
+#include <mutex>
+#include <unistd.h>
+#include <vector>
 #include "interval.h"
 #include "functions.h"
 #include "minimizer.h"
 
 
 using namespace std;
+
+mutex local_min_mutex;
+
+struct CheckMin {
+  double *min;
+  int rank;
+  CheckMin(double *m, int r) : min(m), rank(r) {}
+  void operator()(void) {
+    MPI_Request req[4];
+    MPI_Status status[4];
+    double woldMin[4] = {*min, *min, *min, *min};
+    int flag[4] = {0, 0, 0, 0};
+    flag[rank] = 1;
+    for (int i = 0; i < 4; ++i) {
+      MPI_Irecv(&(woldMin[i]), 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &(req[i]));
+    }
+
+    cout << "flag : " << flag << &(flag[0]) << endl;
+
+    do {
+      for (int i = 0; i < 4; ++i) {
+	if (i != rank) {
+	  MPI_Test(&(req[i]), &(flag[i]), &(status[i]));
+
+	  if (flag[i]) {
+	    {
+	      lock_guard<mutex> guard(local_min_mutex);
+	      if (woldMin[i] < *min) {
+		*min = woldMin[i];
+	      }
+	    }
+	  }
+	}
+      }
+      usleep(50000);
+
+    } while(!(flag[0] && flag[1] && flag[2] && flag[3]));
+  }
+};
 
 
 // Split a 2D box into four subboxes by splitting each dimension
@@ -39,22 +82,27 @@ void minimize(itvfun f,  // Function to minimize
 	      const interval& x, // Current bounds for 1st dimension
 	      const interval& y, // Current bounds for 2nd dimension
 	      double threshold,  // Threshold at which we should stop splitting
-	      double& min_ub,  // Current minimum upper bound
+	      double* min_ub,  // Current minimum upper bound
 	      minimizer_list& ml) // List of current minimizers
 {
   interval fxy = f(x,y);
 
-  if (fxy.left() > min_ub) { // Current box cannot contain minimum?
+  if (fxy.left() > *min_ub) { // Current box cannot contain minimum?
     return ;
   }
 
-  if (fxy.right() < min_ub) { // Current box contains a new minimum?
-    min_ub = fxy.right();
+  if (fxy.right() < *min_ub) { // Current box contains a new minimum?
+    {
+      lock_guard<mutex> guard(local_min_mutex);
+      if (fxy.right() < *min_ub) {
+	*min_ub = fxy.right();
+      }
+    }
     // Discarding all saved boxes whose minimum lower bound is
     // greater than the new minimum upper bound
 #pragma omp critical
     {
-      auto discard_begin = ml.lower_bound(minimizer{0,0,min_ub,0});
+      auto discard_begin = ml.lower_bound(minimizer{0,0,*min_ub,0});
       ml.erase(discard_begin,ml.end());
     }
   }
@@ -137,17 +185,51 @@ int main(int argc, char** argv)
   interval xl, xr, yl, yr;
   split_box(fun.x,fun.y,xl,xr,yl,yr);
 
+  vector<thread> poolThread;
+
   if ( 0 % size == rank) {
-    minimize(fun.f,xl,yl,precision,local_min_ub,minimums);
+    poolThread.push_back(thread(CheckMin(&local_min_ub, rank)));
+    minimize(fun.f,xl,yl,precision,&local_min_ub,minimums);
+
+    for (int i = 0; i < 4; i++) {
+      if (i != rank) {
+	MPI_Request req;
+	MPI_Isend(&local_min_ub, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req);
+      }
+    }
   }
   if ( 1 % size == rank) {
-    minimize(fun.f,xl,yr,precision,local_min_ub,minimums);
+    poolThread.push_back(thread(CheckMin(&local_min_ub, rank)));
+    minimize(fun.f,xl,yr,precision,&local_min_ub,minimums);
+
+    for (int i = 0; i < 4; i++) {
+      if (i != rank) {
+	MPI_Request req;
+	MPI_Isend(&local_min_ub, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req);
+      }
+    }
   }
   if ( 2 % size == rank) {
-    minimize(fun.f,xr,yl,precision,local_min_ub,minimums);
+    poolThread.push_back(thread(CheckMin(&local_min_ub, rank)));
+    minimize(fun.f,xr,yl,precision,&local_min_ub,minimums);
+
+    for (int i = 0; i < 4; i++) {
+      if (i != rank) {
+	MPI_Request req;
+	MPI_Isend(&local_min_ub, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req);
+      }
+    }
   }
   if ( 3 % size == rank) {
-    minimize(fun.f,xr,yr,precision,local_min_ub,minimums);
+    poolThread.push_back(thread(CheckMin(&local_min_ub, rank)));
+    minimize(fun.f,xr,yr,precision,&local_min_ub,minimums);
+
+    for (int i = 0; i < 4; i++) {
+      if (i != rank) {
+	MPI_Request req;
+	MPI_Isend(&local_min_ub, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req);
+      }
+    }
   }
 
   // Displaying all potential minimizers
@@ -161,6 +243,10 @@ int main(int argc, char** argv)
   if (rank == 0) {
     cout << "-- Result ------------------------------" << endl;
     cout << "Upper bound for minimum: " << min_ub << endl;
+  }
+
+  for(auto& t: poolThread) {
+    t.join();
   }
 
   MPI_Finalize();
