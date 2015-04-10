@@ -71,6 +71,7 @@ void minimize(itvfun f,  // Function to minimize
   interval xl, xr, yl, yr;
   split_box(x,y,xl,xr,yl,yr);
 #pragma omp parallel firstprivate(xl,xr,yl,yr) shared(min_ub,ml)
+#pragma omp single nowait
   {
     minimize(f,xl,yl,threshold,min_ub,ml);
 #pragma omp task
@@ -79,6 +80,7 @@ void minimize(itvfun f,  // Function to minimize
     minimize(f,xr,yl,threshold,min_ub,ml);
 #pragma omp task
     minimize(f,xr,yr,threshold,min_ub,ml);
+#pragma omp taskwait
   }
 }
 
