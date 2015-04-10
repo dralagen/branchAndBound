@@ -40,8 +40,6 @@ struct CheckMin {
       MPI_Irecv(&(woldMin[i]), 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &(req[i]));
     }
 
-    cout << "flag : " << flag << &(flag[0]) << endl;
-
     do {
       for (int i = 0; i < 4; ++i) {
 	if (i != rank) {
