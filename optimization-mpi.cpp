@@ -1,11 +1,11 @@
 /*
-  Branch and bound algorithm to find the minimum of continuous binary
-  functions using interval arithmetic.
+   Branch and bound algorithm to find the minimum of continuous binary
+   functions using interval arithmetic.
 
-  Sequential version
+   Sequential version
 
-  Author: Frederic Goualard <Frederic.Goualard@univ-nantes.fr>
-  v. 1.0, 2013-02-15
+Author: Frederic Goualard <Frederic.Goualard@univ-nantes.fr>
+v. 1.0, 2013-02-15
 */
 
 #include <iostream>
@@ -52,8 +52,11 @@ void minimize(itvfun f,  // Function to minimize
     min_ub = fxy.right();
     // Discarding all saved boxes whose minimum lower bound is
     // greater than the new minimum upper bound
-    auto discard_begin = ml.lower_bound(minimizer{0,0,min_ub,0});
-    ml.erase(discard_begin,ml.end());
+#pragma omp critical
+    {
+      auto discard_begin = ml.lower_bound(minimizer{0,0,min_ub,0});
+      ml.erase(discard_begin,ml.end());
+    }
   }
 
   // Checking whether the input box is small enough to stop searching.
@@ -61,6 +64,7 @@ void minimize(itvfun f,  // Function to minimize
   // is always split equally along both dimensions
   if (x.width() <= threshold) {
     // We have potentially a new minimizer
+#pragma omp critical
     ml.insert(minimizer{x,y,fxy.left(),fxy.right()});
     return ;
   }
@@ -70,10 +74,19 @@ void minimize(itvfun f,  // Function to minimize
   interval xl, xr, yl, yr;
   split_box(x,y,xl,xr,yl,yr);
 
-  minimize(f,xl,yl,threshold,min_ub,ml);
-  minimize(f,xl,yr,threshold,min_ub,ml);
-  minimize(f,xr,yl,threshold,min_ub,ml);
-  minimize(f,xr,yr,threshold,min_ub,ml);
+#pragma omp parallel
+#pragma omp single nowait
+  {
+#pragma omp task shared(min_ub)
+    minimize(f,xl,yl,threshold,min_ub,ml);
+#pragma omp task shared(min_ub)
+    minimize(f,xl,yr,threshold,min_ub,ml);
+#pragma omp task shared(min_ub)
+    minimize(f,xr,yl,threshold,min_ub,ml);
+#pragma omp task shared(min_ub)
+    minimize(f,xr,yr,threshold,min_ub,ml);
+#pragma omp taskwait
+  }
 }
 
 
