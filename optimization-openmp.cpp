@@ -70,15 +70,16 @@ void minimize(itvfun f,  // Function to minimize
   // and recursively explore them
   interval xl, xr, yl, yr;
   split_box(x,y,xl,xr,yl,yr);
-#pragma omp parallel firstprivate(xl,xr,yl,yr) shared(min_ub,ml)
+#pragma omp parallel
 #pragma omp single nowait
   {
+#pragma omp task shared(min_ub)
     minimize(f,xl,yl,threshold,min_ub,ml);
-#pragma omp task
+#pragma omp task shared(min_ub)
     minimize(f,xl,yr,threshold,min_ub,ml);
-#pragma omp task
+#pragma omp task shared(min_ub)
     minimize(f,xr,yl,threshold,min_ub,ml);
-#pragma omp task
+#pragma omp task shared(min_ub)
     minimize(f,xr,yr,threshold,min_ub,ml);
 #pragma omp taskwait
   }
