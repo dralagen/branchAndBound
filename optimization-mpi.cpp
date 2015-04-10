@@ -152,7 +152,6 @@ int main(int argc, char** argv)
   cout.precision(16);
   // By default, the currently known upper bound for the minimizer is +oo
   double min_ub = numeric_limits<double>::infinity();
-  double local_min_ub = numeric_limits<double>::infinity();
   // List of potential minimizers. They may be removed from the list
   // if we later discover that their smallest minimum possible is
   // greater than the new current upper bound
@@ -186,66 +185,65 @@ int main(int argc, char** argv)
   vector<thread> poolThread;
 
   if ( 0 % size == rank) {
-    poolThread.push_back(thread(CheckMin(&local_min_ub, rank)));
-    minimize(fun.f,xl,yl,precision,&local_min_ub,minimums);
+    poolThread.push_back(thread(CheckMin(&min_ub, rank)));
+    minimize(fun.f,xl,yl,precision,&min_ub,minimums);
 
     for (int i = 0; i < 4; i++) {
       if (i != rank) {
 	MPI_Request req;
-	MPI_Isend(&local_min_ub, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req);
+	MPI_Isend(&min_ub, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req);
       }
     }
   }
   if ( 1 % size == rank) {
-    poolThread.push_back(thread(CheckMin(&local_min_ub, rank)));
-    minimize(fun.f,xl,yr,precision,&local_min_ub,minimums);
+    poolThread.push_back(thread(CheckMin(&min_ub, rank)));
+    minimize(fun.f,xl,yr,precision,&min_ub,minimums);
 
     for (int i = 0; i < 4; i++) {
       if (i != rank) {
 	MPI_Request req;
-	MPI_Isend(&local_min_ub, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req);
+	MPI_Isend(&min_ub, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req);
       }
     }
   }
   if ( 2 % size == rank) {
-    poolThread.push_back(thread(CheckMin(&local_min_ub, rank)));
-    minimize(fun.f,xr,yl,precision,&local_min_ub,minimums);
+    poolThread.push_back(thread(CheckMin(&min_ub, rank)));
+    minimize(fun.f,xr,yl,precision,&min_ub,minimums);
 
     for (int i = 0; i < 4; i++) {
       if (i != rank) {
 	MPI_Request req;
-	MPI_Isend(&local_min_ub, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req);
+	MPI_Isend(&min_ub, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req);
       }
     }
   }
   if ( 3 % size == rank) {
-    poolThread.push_back(thread(CheckMin(&local_min_ub, rank)));
-    minimize(fun.f,xr,yr,precision,&local_min_ub,minimums);
+    poolThread.push_back(thread(CheckMin(&min_ub, rank)));
+    minimize(fun.f,xr,yr,precision,&min_ub,minimums);
 
     for (int i = 0; i < 4; i++) {
       if (i != rank) {
 	MPI_Request req;
-	MPI_Isend(&local_min_ub, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req);
+	MPI_Isend(&min_ub, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req);
       }
     }
   }
 
   // Displaying all potential minimizers
-  copy(minimums.begin(),minimums.end(),
-       ostream_iterator<minimizer>(cout,"\n"));
-  cout << "Number of minimizers: " << minimums.size() << endl;
-  cout << "Upper bound for minimum: " << local_min_ub << endl;
+//  copy(minimums.begin(),minimums.end(),
+//       ostream_iterator<minimizer>(cout,"\n"));
+//  cout << "Number of minimizers: " << minimums.size() << endl;
+//  cout << "Upper bound for minimum: " << min_ub << endl;
 
-  MPI_Reduce(&local_min_ub, &min_ub, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
+  for(auto& t: poolThread) {
+    t.join();
+  }
 
   if (rank == 0) {
     cout << "-- Result ------------------------------" << endl;
     cout << "Upper bound for minimum: " << min_ub << endl;
   }
 
-  for(auto& t: poolThread) {
-    t.join();
-  }
 
   MPI_Finalize();
 }
