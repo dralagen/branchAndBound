@@ -239,8 +239,13 @@ int main(int argc, char** argv)
     t.join();
   }
 
+  int nbMinimums;
+  int local_nbMinimums = minimums.size();
+  MPI_Reduce(&local_nbMinimums, &nbMinimums, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
   if (rank == 0) {
     cout << "-- Result ------------------------------" << endl;
+    cout << "Number of minimizers: " << nbMinimums << endl;
     cout << "Upper bound for minimum: " << min_ub << endl;
   }
 
